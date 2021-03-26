@@ -1,0 +1,64 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5434/checkout
+    username: admin
+    password: admin
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-test-query: select 1
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        #default_schema: checkout
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        show_sql: true
+        use_sql_comments: true
+        jdbc:
+          lob:
+            non_contextual_creation: true
+  cloud:
+    stream:
+      kafka:
+        #Diz quem será a aplicação para mensageria
+        binder:
+          autoCreateTopics: false
+          brokers: localhost:9092
+          configuration:
+            value:
+              deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
+              serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
+            key:
+              deserializer: io.confluent.kafka.serializers.KafkaAvroDeserializer
+              serializer: io.confluent.kafka.serializers.KafkaAvroSerializer
+      bindings:
+        #Aqui temos o nosso binding virtual
+        #Esse tópico só irá receber eventos quando um checkout for criado
+        checkout-created-output:
+          #Quando o binding virtual for chamado, este, por sua vez
+          #executará o nosso binding real, padronizado desta forma:
+          #tipo de informação, nome do domínio, entidade que estamos publicando, ação que está fazendo
+          #Poderiamos criar um microsserviço de envio de email. Toda vez que um evento fosse disparado, o
+          #nosso microsserviço escutaria esse destino abaixo, enviando o e-mail.
+          destination: streaming.ecommerce.checkout.created
+          #Em vez de dizermos que é um application json, dizemos que é um application avro
+          contentType: application/*+avro
+          producer:
+            use-native-encoding: true
+        payment-paid-input:
+          destination: streaming.ecommerce.payment.paid
+          contentType: application/*+avro
+          group: ${spring.application.name}
+          consumer:
+            use-native-decoding: true
+  kafka:
+    properties:
+      schema:
+        registry:
+          url: http://localhost:8081
+  application:
+    name: checkout-api
+  server:
+    port: 8085
